@@ -1,7 +1,11 @@
-asgiref==3.11.0
+asgiref==3.11.0 #Нужно для ASGI совместимости django
 Django==6.0.1
 pillow==12.1.0
-psycopg==3.3.2
-psycopg-binary==3.3.2
-sqlparse==0.5.5
-typing_extensions==4.15.0
+sqlparse==0.5.5 #Для работы с SQL в django
+typing_extensions==4.15.0 #Поддержка типизации
+djangorestframework==3.15.2 #Для создания API
+djangorestframework-simplejwt>=5.3.1 #Для работы с JWT-токеном
+django-cors-headers==4.5.0 #Для CORS
+psycopg2-binary==2.9.10  #Для PostgreSQL в Docker
+django-phonenumber-field==5.1.0 #Для валидации телефона
+phonenumbers==8.12.23 #Для валидации телефона
