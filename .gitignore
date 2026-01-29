@@ -17,3 +17,5 @@ env/
 
 # Docker
 postgres_data/
+
+.media/

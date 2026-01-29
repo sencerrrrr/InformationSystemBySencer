@@ -3,6 +3,11 @@ FROM python:3.12-slim
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
+    zlib1g-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    libwebp-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

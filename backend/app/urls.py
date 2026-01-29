@@ -1,6 +1,8 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenVerifyView
 from . import views
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('check-data/', views.check_data, name='check_data'),
@@ -17,5 +19,9 @@ urlpatterns = [
     path('api/auth/logout/', views.LogoutAPI.as_view(), name='logout'),
     path('api/auth/refresh/', views.RefreshTokenAPI.as_view(), name='token_refresh'),
     path('api/auth/verify/', TokenVerifyView.as_view(), name='token_verify'),
-    path('api/auth/profile/', views.UserProfileAPI.as_view(), name='user_profile'),
+
+    path("api/students/<int:pk>/certificate/", views.StudentCertificateAPI.as_view(), name="student-certificate"),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

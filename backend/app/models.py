@@ -3,6 +3,10 @@ from django.core.validators import RegexValidator, MinValueValidator, MaxValueVa
 from django.db import models
 from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
+from imagekit.models import ProcessedImageField
+from imagekit.processors import ResizeToFit, Transpose
+from django.core.validators import FileExtensionValidator, MaxValueValidator
+import os
 
 
 # ==============================================================
@@ -128,10 +132,10 @@ class BaseModel(AuditMixin, SoftDeleteMixin):
 
     # Автоматическое заполнение created_by/update_by при сохранении
     def save(self, *args, **kwargs):
-        # Импорт происходит здесь, чтобы избежать цикличного импорта
-        from django.contrib.auth import get_user
-
         try:
+            # Импорт происходит здесь, чтобы избежать цикличного импорта
+            from django.contrib.auth import get_user
+
             user = get_user()
             if user and user.is_authenticated:
                 if not self.pk:  # Если объект создается
@@ -140,9 +144,7 @@ class BaseModel(AuditMixin, SoftDeleteMixin):
             super().save(*args, **kwargs)
         except:
             # Если пользователь не доступен (например, в миграциях)
-            pass
-
-        super().save(*args, **kwargs)
+            super().save(*args, **kwargs)
 
 
 # =============================================================
@@ -508,6 +510,26 @@ class Student(BaseModel):
         null=True,
         blank=True,
     )
+    photo = ProcessedImageField(
+        upload_to='students/photos/',
+        processors=[
+            Transpose(),  # Автоматический поворот по EXIF (если фото с телефона)
+            ResizeToFit(800, 800),  # Максимальный размер 800x800 пикселей
+        ],
+        format='JPEG',
+        options={
+            'quality': 75,
+            'optimize': True,
+            'progressive': True,
+        },
+        verbose_name='Фотография студента',
+        help_text='Загрузите фотографию. Она будет автоматически сжата до 800x800 пикселей',
+        validators=[
+            FileExtensionValidator(['jpg', 'jpeg', 'png'])
+        ],
+        blank=True,
+        null=True,
+    )
     birth_date = models.DateField(
         verbose_name='Дата рождения',
         help_text='Введите дату рождения',
@@ -535,11 +557,52 @@ class Student(BaseModel):
             models.Index(fields=['is_deleted', 'name', 'lastname', 'middlename']),
         ]
 
-    def __str__(self):
+    @property
+    def full_name(self):
+        """Полное ФИО"""
+        parts = [self.lastname, self.name]
         if self.middlename:
-            return f"{self.lastname} {self.name} {self.middlename}"
-        return f"{self.lastname} {self.name}"
+            parts.append(self.middlename)
+        return " ".join(parts)
 
     @property
-    def username(self):
-        return self.user.username
+    def photo_size(self):
+        """Размер фото в МБ"""
+        if self.photo and hasattr(self.photo, 'size'):
+            return f"{self.photo.size / 1024 / 1024:.1f} МБ"
+        return "Нет фото"
+
+    def __str__(self):
+        return self.full_name
+
+    def save(self, *args, **kwargs):
+        """Удаляем старое фото при обновлении"""
+        if self.pk:  # Если объект уже существует
+            try:
+                old_student = Student.objects.get(pk=self.pk)
+                if old_student.photo and old_student.photo != self.photo:
+                    # Удаляем старый файл
+                    if os.path.exists(old_student.photo.path):
+                        os.remove(old_student.photo.path)
+            except Student.DoesNotExist:
+                pass
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        """Удаляем файл фото при удалении"""
+        if self.photo:
+            if os.path.exists(self.photo.path):
+                os.remove(self.photo.path)
+        super().delete(*args, **kwargs)
+
+    def clean(self):
+        """Валидация размера файла"""
+        super().clean()
+        if self.photo and hasattr(self.photo, 'size'):
+            max_size = 10 * 1024 * 1024  # 10 MB
+            if self.photo.size > max_size:
+                from django.core.exceptions import ValidationError
+                raise ValidationError({
+                    'photo': f'Файл слишком большой. Максимальный размер: 10MB'
+                })

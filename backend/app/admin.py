@@ -72,49 +72,59 @@ class SoftDeleteAdmin(admin.ModelAdmin):
 @admin.register(Region)
 class RegionAdmin(SoftDeleteAdmin):
     search_fields = ['name']
-    list_display = ['name', 'created_at', 'get_is_deleted_display']
+    list_display = ['name']
     list_filter = ['is_deleted'] + SoftDeleteAdmin.list_filter
 
 
 @admin.register(City)
 class CityAdmin(SoftDeleteAdmin):
     search_fields = ['name', 'region__name']
-    list_display = ['name', 'region', 'created_at', 'get_is_deleted_display']
+    list_display = ['name', 'region']
     list_filter = ['region', 'is_deleted'] + SoftDeleteAdmin.list_filter
 
 
 @admin.register(Student)
 class StudentAdmin(SoftDeleteAdmin):
     search_fields = ['lastname', 'name', 'middlename', 'user__username']
-    list_display = ['__str__', 'group', 'created_at', 'get_is_deleted_display']
+    list_display = ['__str__', 'photo_preview',  'group']
     list_filter = ['group', 'is_deleted'] + SoftDeleteAdmin.list_filter
+    readonly_fields = SoftDeleteAdmin.readonly_fields + ['photo_preview']
+
+    def photo_preview(self, obj):
+        if obj.photo:
+            return mark_safe(
+                f'<img src="{obj.photo.url}" style="max-height: 100px; border-radius: 5px;" />'
+            )
+        return "—"
+
+    photo_preview.short_description = "Фото"
 
 
 @admin.register(Teacher)
 class TeacherAdmin(SoftDeleteAdmin):
     search_fields = ['lastname', 'name', 'middlename', 'user__username']
-    list_display = ['__str__', 'created_at', 'get_is_deleted_display']
+    list_display = ['__str__']
     list_filter = ['is_deleted'] + SoftDeleteAdmin.list_filter
 
 
 @admin.register(CodeSpeciality)
 class CodeSpecialityAdmin(SoftDeleteAdmin):
     search_fields = ['code', 'description']
-    list_display = ['code', 'description', 'created_at', 'get_is_deleted_display']
+    list_display = ['code', 'get_is_deleted_display']
     list_filter = ['is_deleted'] + SoftDeleteAdmin.list_filter
 
 
 @admin.register(Speciality)
 class SpecialityAdmin(SoftDeleteAdmin):
     search_fields = ['name', 'code__code']
-    list_display = ['__str__', 'code', 'is_active', 'created_at', 'get_is_deleted_display']
+    list_display = ['__str__', 'code', 'is_active']
     list_filter = ['is_active', 'is_deleted'] + SoftDeleteAdmin.list_filter
 
 
 @admin.register(Qualification)
 class QualificationAdmin(SoftDeleteAdmin):
     search_fields = ['name', 'speciality__name']
-    list_display = ['name', 'speciality', 'based', 'duration_months', 'created_at', 'get_is_deleted_display']
+    list_display = ['name', 'speciality']
     list_filter = ['speciality', 'based', 'is_deleted'] + SoftDeleteAdmin.list_filter
 
 
@@ -125,11 +135,6 @@ class GroupAdmin(SoftDeleteAdmin):
         'name',
         'speciality',
         'qualification',
-        'curator',
-        'start_year',
-        'end_year',
-        'is_active',
-        'created_at',
-        'get_is_deleted_display',
+        'curator'
     ]
     list_filter = ['speciality', 'qualification', 'curator', 'is_active', 'is_deleted'] + SoftDeleteAdmin.list_filter

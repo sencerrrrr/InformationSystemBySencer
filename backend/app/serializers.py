@@ -31,7 +31,20 @@ class StudentCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Student
-        fields = ['name', 'username', 'password']
+        fields = [
+            'username', 'password', 'email',
+            'lastname', 'name', 'middlename',
+            'photo', 'birth_date', 'phone', 'group'
+        ]
+
+    def validate_photo(self, value):
+        if value and hasattr(value, 'size'):
+            max_size = 10 * 1024 * 1024  # 10 MB
+            if value.size > max_size:
+                raise serializers.ValidationError(
+                    f'Файл слишком большой. Максимальный размер: 10MB'
+                )
+        return value
 
     def create(self, validated_data):
         username = validated_data.pop('username')
@@ -42,12 +55,9 @@ class StudentCreateSerializer(serializers.ModelSerializer):
             password=password
         )
 
-        student = Student.objects.create(
-            user=user,
-            name=validated_data['name']
-        )
-
+        student = Student.objects.create(user=user, **validated_data)
         return student
+
 
 class TeacherSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -55,6 +65,7 @@ class TeacherSerializer(serializers.ModelSerializer):
     class Meta:
         model = Teacher
         fields = ('id', 'user', 'name')
+
 
 class TeacherCreateSerializer(serializers.ModelSerializer):
     username = serializers.CharField(write_only=True)
