@@ -58,14 +58,10 @@ MIDDLEWARE = [
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
 
     'AUTH_COOKIE': 'access_token',  # Имя куки для access token
-    'AUTH_COOKIE_REFRESH': 'refresh_token',  # Имя куки для refresh token
     'AUTH_COOKIE_SECURE': False,  # True для HTTPS только
-    'AUTH_COOKIE_HTTP_ONLY': True,  # Защита от XSS
+    'AUTH_COOKIE_HTTP_ONLY': True,
     'AUTH_COOKIE_PATH': '/',
     'AUTH_COOKIE_SAMESITE': 'Lax',  # Защита от CSRF
 }

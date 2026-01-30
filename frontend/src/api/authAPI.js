@@ -13,8 +13,4 @@ export const authAPI = {
     await dbConnect.post("/api/auth/logout/");
   },
 
-  getCurrentUser: async () => {
-    const response = await dbConnect.get("/api/auth/me/");
-    return response.data;
-  },
 };

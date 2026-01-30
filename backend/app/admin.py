@@ -103,9 +103,19 @@ class StudentAdmin(SoftDeleteAdmin):
 @admin.register(Teacher)
 class TeacherAdmin(SoftDeleteAdmin):
     search_fields = ['lastname', 'name', 'middlename', 'user__username']
-    list_display = ['__str__']
+    list_display = ['__str__', 'photo_preview']
     list_filter = ['is_deleted'] + SoftDeleteAdmin.list_filter
 
+    readonly_fields = SoftDeleteAdmin.readonly_fields + ['photo_preview']
+
+    def photo_preview(self, obj):
+        if obj.photo:
+            return mark_safe(
+                f'<img src="{obj.photo.url}" style="max-height: 100px; border-radius: 5px;" />'
+            )
+        return "—"
+
+    photo_preview.short_description = "Фото"
 
 @admin.register(CodeSpeciality)
 class CodeSpecialityAdmin(SoftDeleteAdmin):
@@ -138,3 +148,6 @@ class GroupAdmin(SoftDeleteAdmin):
         'curator'
     ]
     list_filter = ['speciality', 'qualification', 'curator', 'is_active', 'is_deleted'] + SoftDeleteAdmin.list_filter
+
+
+admin.site.register(Role)

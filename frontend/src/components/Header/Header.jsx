@@ -1,12 +1,15 @@
-import { Link } from "react-router-dom";
-import { authAPI } from "../../api/authAPI";
+import { Link, useNavigate } from "react-router-dom";
+import { useContext } from "react";
+import { AuthContext } from "../../contexts/AuthContext"
 
 export const Header = () => {
-  const { logout } = authAPI;
+  const { isAuthenticated, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
       await logout();
+      navigate("/login", { replace: true });
     } catch (e) {
       console.error("Ошибка выхода", e);
     }
@@ -20,15 +23,17 @@ export const Header = () => {
             <Link to="/">Главная</Link>
           </li>
 
-          <li>
-            <Link to="/login">Вход</Link>
-          </li>
-
-          <li>
-            <button type="button" onClick={handleLogout}>
-              Выйти
-            </button>
-          </li>
+          {!isAuthenticated ? (
+            <li>
+              <Link to="/login">Войти</Link>
+            </li>
+          ) : (
+            <li>
+              <button type="button" onClick={handleLogout}>
+                Выйти
+              </button>
+            </li>
+          )}
         </ul>
       </nav>
     </header>

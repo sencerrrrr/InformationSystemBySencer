@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, AbstractUser
 from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
@@ -151,6 +151,16 @@ class BaseModel(AuditMixin, SoftDeleteMixin):
 # ======================КОНКРЕТНЫЕ МОДЕЛИ======================
 # =============================================================
 
+class Role(BaseModel):
+    name = models.CharField(
+        max_length=30,
+        unique=True,
+        verbose_name='Роль',
+        help_text='Введите роль',
+    )
+
+    def __str__(self):
+        return self.name
 
 class Region(BaseModel):
     name = models.CharField(
@@ -232,6 +242,26 @@ class Teacher(BaseModel):
         null=True,
         blank=True,
     )
+    photo = ProcessedImageField(
+        upload_to='teachers/photos/',
+        processors=[
+            Transpose(),  # Автоматический поворот по EXIF (если фото с телефона)
+            ResizeToFit(800, 800),  # Максимальный размер 800x800 пикселей
+        ],
+        format='JPEG',
+        options={
+            'quality': 75,
+            'optimize': True,
+            'progressive': True,
+        },
+        verbose_name='Фотография преподавателя',
+        help_text='Загрузите фотографию. Она будет автоматически сжата до 800x800 пикселей',
+        validators=[
+            FileExtensionValidator(['jpg', 'jpeg', 'png'])
+        ],
+        blank=True,
+        null=True,
+    )
     birth_date = models.DateField(
         verbose_name='Дата рождения',
         help_text='Введите дату рождения',
@@ -253,10 +283,55 @@ class Teacher(BaseModel):
             models.Index(fields=['is_deleted', 'name', 'lastname', 'middlename']),
         ]
 
-    def __str__(self):
+    @property
+    def full_name(self):
+        """Полное ФИО"""
+        parts = [self.lastname, self.name]
         if self.middlename:
-            return f"{self.lastname} {self.name} {self.middlename}"
-        return f"{self.lastname} {self.name}"
+            parts.append(self.middlename)
+        return " ".join(parts)
+
+    @property
+    def photo_size(self):
+        """Размер фото в МБ"""
+        if self.photo and hasattr(self.photo, 'size'):
+            return f"{self.photo.size / 1024 / 1024:.1f} МБ"
+        return "Нет фото"
+
+    def __str__(self):
+        return self.full_name
+
+    def save(self, *args, **kwargs):
+        """Удаляем старое фото при обновлении"""
+        if self.pk:  # Если объект уже существует
+            try:
+                old_teacher = Teacher.objects.get(pk=self.pk)
+                if old_teacher.photo and old_teacher.photo != self.photo:
+                    # Удаляем старый файл
+                    if os.path.exists(old_teacher.photo.path):
+                        os.remove(old_teacher.photo.path)
+            except Teacher.DoesNotExist:
+                pass
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        """Удаляем файл фото при удалении"""
+        if self.photo:
+            if os.path.exists(self.photo.path):
+                os.remove(self.photo.path)
+        super().delete(*args, **kwargs)
+
+    def clean(self):
+        """Валидация размера файла"""
+        super().clean()
+        if self.photo and hasattr(self.photo, 'size'):
+            max_size = 10 * 1024 * 1024  # 10 MB
+            if self.photo.size > max_size:
+                from django.core.exceptions import ValidationError
+                raise ValidationError({
+                    'photo': f'Файл слишком большой. Максимальный размер: 10MB'
+                })
 
 
 class CodeSpeciality(BaseModel):
@@ -402,8 +477,46 @@ class Qualification(BaseModel):
         ]
         unique_together = ['speciality', 'name', 'based']
 
+    @property
+    def duration_display(self):
+        """Отображает длительность обучения в читаемом формате"""
+        months = self.duration_months
+
+        # Вычисляем годы и месяцы
+        years = months // 12
+        remaining_months = months % 12
+
+        # Формируем строку
+        if years == 0:
+            return f"{months} месяцев"
+        elif remaining_months == 0:
+            if years == 1:
+                return "1 год"
+            elif 2 <= years <= 4:
+                return f"{years} года"
+            else:
+                return f"{years} лет"
+        else:
+            years_str = ""
+            if years == 1:
+                years_str = "1 год"
+            elif 2 <= years <= 4:
+                years_str = f"{years} года"
+            else:
+                years_str = f"{years} лет"
+
+            months_str = ""
+            if remaining_months == 1:
+                months_str = "1 месяц"
+            elif 2 <= remaining_months <= 4:
+                months_str = f"{remaining_months} месяца"
+            else:
+                months_str = f"{remaining_months} месяцев"
+
+            return f"{years_str} и {months_str}"
+
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.duration_display})"
 
 
 class Group(BaseModel):
@@ -491,6 +604,14 @@ class Student(BaseModel):
         help_text='Выберите пользователя',
         related_name='student_profile',
     )
+    role = models.ForeignKey(
+        Role,
+        on_delete=models.PROTECT,
+        verbose_name='Роль пользователя',
+        help_text='Выберите роль пользователя',
+        null=True,
+        blank=True,
+    )
     lastname = models.CharField(
         max_length=50,
         verbose_name='Фамилия',
@@ -539,12 +660,21 @@ class Student(BaseModel):
         verbose_name='Телефон',
         help_text='Введите номер телефона',
     )
+    city = models.OneToOneField(
+        City,
+        on_delete=models.PROTECT,
+        verbose_name='Город студента',
+        help_text='Выберите город студента',
+        null=True,
+        blank=True,
+    )
     group = models.ForeignKey(
         Group,
         on_delete=models.PROTECT,
         verbose_name='Группа',
         help_text='Выберите группу',
     )
+
 
     class Meta:
         verbose_name = 'Студент'
@@ -606,3 +736,56 @@ class Student(BaseModel):
                 raise ValidationError({
                     'photo': f'Файл слишком большой. Максимальный размер: 10MB'
                 })
+
+    @property
+    def course(self):
+        """
+        Определяет текущий курс студента в римских цифрах.
+        Учебный год: сентябрь-июнь.
+        I курс: первый учебный год
+        II курс: второй учебный год
+        III курс: третий учебный год
+        IV курс: четвертый учебный год
+        """
+        if not self.group or not self.group.start_year:
+            return None
+
+        now = timezone.now()
+        current_year = now.year
+        current_month = now.month
+
+        # Определяем начало текущего учебного года
+        # Если сейчас сентябрь (9) или позже - учебный год начался в этом году
+        # Если август (8) или раньше - учебный год начался в прошлом году
+        if current_month >= 9:  # Сентябрь-декабрь
+            academic_year_start = current_year
+        else:  # Январь-август
+            academic_year_start = current_year - 1
+
+        # Вычисляем курс
+        years_diff = academic_year_start - self.group.start_year
+
+        # Если учебный год еще не начался
+        if years_diff < 0:
+            return None
+
+        # Конвертируем в римские цифры
+        roman_courses = ['I', 'II', 'III', 'IV', 'V', 'VI']
+
+        # Нумерация курсов с 1
+        course_num = years_diff + 1
+
+        # Возвращаем римскую цифру, если курс в пределах списка
+        if course_num <= len(roman_courses):
+            return roman_courses[course_num - 1]
+
+        # Если курс больше 6, возвращаем арабскую цифру
+        return str(course_num)
+
+    @property
+    def course_display(self):
+        """Отображение курса в читаемом формате"""
+        course = self.course
+        if course is None:
+            return "—"
+        return f"{course} курс"

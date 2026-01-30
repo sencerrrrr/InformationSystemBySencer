@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { authAPI } from "../../api/authAPI";
+import { AuthContext } from "../../contexts/AuthContext";
 
 export const LoginForm = () => {
-  const { login } = authAPI;
+  const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [username, setUsername] = useState("");
@@ -15,9 +15,9 @@ export const LoginForm = () => {
     try {
       await login(username, password);
       setError("");
-      navigate("/");
-    } catch (error) {
-      setError(error.error || error.message || "Ошибка при входе");
+      navigate("/", { replace: true });
+    } catch (e) {
+      setError(e.error || e.message || "Ошибка при входе");
     }
   };
 
